@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -23,23 +24,31 @@ import (
 
 const (
 	//sepolia
-	slot0Timestamp uint64 = 1655733600
-	beaconEndpoint        = "http://88.99.30.186:3500"
-
-	//blob retention period
-	slotAgeThreshold uint64 = 3600
-	listingAddr             = ":3500"
-	versionMethod           = "/eth/v1/node/version"
-	specMethod              = "/eth/v1/config/spec"
-	genesisMethod           = "/eth/v1/beacon/genesis"
-	sidecarsMethod          = "/eth/v1/beacon/blob_sidecars/{id}"
+	slot0Timestamp         uint64 = 1655733600
+	beaconEndpointDefault         = "http://88.99.30.186:3500"
+	portDefault                   = 3600
+	retentionPeriodDefault uint64 = 3600 * 3
+	versionMethod                 = "/eth/v1/node/version"
+	specMethod                    = "/eth/v1/config/spec"
+	genesisMethod                 = "/eth/v1/beacon/genesis"
+	sidecarsMethod                = "/eth/v1/beacon/blob_sidecars/{id}"
 )
 
 var (
+	port             uint64
+	retentionPeriod  uint64
+	beaconEndpoint   string
 	emptySidecarList = &struct {
 		Data []interface{} `json:"data"`
 	}{Data: []interface{}{}}
 )
+
+func init() {
+	flag.Uint64Var(&retentionPeriod, "r", retentionPeriodDefault, "blob retention period in seconds")
+	flag.Uint64Var(&port, "p", portDefault, "port")
+	flag.StringVar(&beaconEndpoint, "b", beaconEndpointDefault, "beacon endpoint")
+	flag.Parse()
+}
 
 func main() {
 	targetURL, _ := url.Parse(beaconEndpoint)
@@ -52,7 +61,7 @@ func main() {
 	server := &http.Server{
 		Handler: r,
 	}
-	listener, err := net.Listen("tcp", listingAddr)
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -92,7 +101,7 @@ func handleBlobSidecarsRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	// if block is not in the retention window  return 200 w/ empty list
 	// refer to https://github.com/prysmaticlabs/prysm/blob/feb16ae4aaa41d9bcd066b54b779dcd38fc928d2/beacon-chain/rpc/lookup/blocker.go#L226C20-L226C41
-	if age > slotAgeThreshold {
+	if age > retentionPeriodDefault {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(emptySidecarList)
 		return
