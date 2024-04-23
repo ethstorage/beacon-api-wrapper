@@ -26,7 +26,7 @@ const (
 	//sepolia
 	slot0Timestamp         uint64 = 1655733600
 	beaconEndpointDefault         = "http://88.99.30.186:3500"
-	portDefault                   = 3600
+	addressDefault                = "0.0.0.0:3600"
 	retentionPeriodDefault uint64 = 3600 * 3
 	versionMethod                 = "/eth/v1/node/version"
 	specMethod                    = "/eth/v1/config/spec"
@@ -35,8 +35,8 @@ const (
 )
 
 var (
-	port             uint64
 	retentionPeriod  uint64
+	address          string
 	beaconEndpoint   string
 	emptySidecarList = &struct {
 		Data []interface{} `json:"data"`
@@ -45,7 +45,7 @@ var (
 
 func init() {
 	flag.Uint64Var(&retentionPeriod, "r", retentionPeriodDefault, "blob retention period in seconds")
-	flag.Uint64Var(&port, "p", portDefault, "port")
+	flag.StringVar(&address, "a", addressDefault, "listening address + port")
 	flag.StringVar(&beaconEndpoint, "b", beaconEndpointDefault, "beacon endpoint")
 	flag.Parse()
 }
@@ -61,7 +61,7 @@ func main() {
 	server := &http.Server{
 		Handler: r,
 	}
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		log.Fatal(err)
 	}
