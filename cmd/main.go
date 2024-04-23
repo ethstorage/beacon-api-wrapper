@@ -72,6 +72,9 @@ func main() {
 		}
 	}()
 	log.Printf("Beacon API wrapper started on %s\n", listener.Addr().String())
+	log.Printf("Beacon endpoint: %s\n", beaconEndpoint)
+	log.Printf("Retaining blobs for %d seconds \n", retentionPeriod)
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
@@ -102,8 +105,9 @@ func handleBlobSidecarsRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	// if block is not in the retention window  return 200 w/ empty list
 	// refer to https://github.com/prysmaticlabs/prysm/blob/feb16ae4aaa41d9bcd066b54b779dcd38fc928d2/beacon-chain/rpc/lookup/blocker.go#L226C20-L226C41
-	if age > retentionPeriodDefault {
+	if age > retentionPeriod {
 		w.Header().Set("Content-Type", "application/json")
+		log.Printf("Block %s is not in the retention window\n", id)
 		json.NewEncoder(w).Encode(emptySidecarList)
 		return
 	}
@@ -124,6 +128,8 @@ func slotAge(id string) (uint64, error) {
 		return 0, err
 	}
 	slotTime := slot0Timestamp + slot*12
+	fmt.Println("slot time:", time.Unix(int64(slotTime), 0).Format("2006/01/02 15:04:05"))
+
 	now := time.Now().Unix()
 	if slotTime > uint64(now) {
 		return 0, errors.New("invalid slot")
