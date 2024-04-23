@@ -9,10 +9,10 @@ A beacon API wrapper for archiver tests
 # Options
 
 ```
-  -a string
-        listening address + port (default "0.0.0.0:3600")
   -b string
         beacon endpoint (default "http://88.99.30.186:3500")
+  -p int
+        listening port (default 3600)
   -r uint
         blob retention period in seconds (default 10800)
 ```

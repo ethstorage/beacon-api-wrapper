@@ -26,7 +26,7 @@ const (
 	//sepolia
 	slot0Timestamp         uint64 = 1655733600
 	beaconEndpointDefault         = "http://88.99.30.186:3500"
-	addressDefault                = "0.0.0.0:3600"
+	portDefault                   = 3600
 	retentionPeriodDefault uint64 = 3600 * 3
 	versionMethod                 = "/eth/v1/node/version"
 	specMethod                    = "/eth/v1/config/spec"
@@ -36,7 +36,7 @@ const (
 
 var (
 	retentionPeriod  uint64
-	address          string
+	port             int
 	beaconEndpoint   string
 	emptySidecarList = &struct {
 		Data []interface{} `json:"data"`
@@ -45,7 +45,7 @@ var (
 
 func init() {
 	flag.Uint64Var(&retentionPeriod, "r", retentionPeriodDefault, "blob retention period in seconds")
-	flag.StringVar(&address, "a", addressDefault, "listening address + port")
+	flag.IntVar(&port, "p", portDefault, "listening port")
 	flag.StringVar(&beaconEndpoint, "b", beaconEndpointDefault, "beacon endpoint")
 	flag.Parse()
 }
@@ -61,7 +61,8 @@ func main() {
 	server := &http.Server{
 		Handler: r,
 	}
-	listener, err := net.Listen("tcp", address)
+	endpoint := net.JoinHostPort("0.0.0.0", strconv.Itoa(port))
+	listener, err := net.Listen("tcp", endpoint)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -116,6 +117,7 @@ func createReverseProxy(targetURL *url.URL) http.HandlerFunc {
 		httputil.NewSingleHostReverseProxy(targetURL).ServeHTTP(w, r)
 	}
 }
+
 func slotAge(id string) (uint64, error) {
 	slot, err := strconv.ParseUint(id, 10, 64)
 	if err != nil {
