@@ -11,6 +11,8 @@ A beacon API wrapper for archiver tests
 ```
   -b string
         beacon endpoint (default "http://88.99.30.186:3500")
+  -g uint
+        beacon chain genesis time (timestamp of slot 0) (default 1655733600)
   -p int
         listening port (default 3600)
   -r uint

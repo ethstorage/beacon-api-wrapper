@@ -24,7 +24,7 @@ import (
 
 const (
 	//sepolia
-	slot0Timestamp         uint64 = 1655733600
+	slot0TimestampDefault  uint64 = 1655733600
 	beaconEndpointDefault         = "http://88.99.30.186:3500"
 	portDefault                   = 3600
 	retentionPeriodDefault uint64 = 3600 * 3
@@ -35,6 +35,7 @@ const (
 )
 
 var (
+	slot0Timestamp   uint64
 	retentionPeriod  uint64
 	port             int
 	beaconEndpoint   string
@@ -44,6 +45,7 @@ var (
 )
 
 func init() {
+	flag.Uint64Var(&slot0Timestamp, "g", slot0TimestampDefault, "beacon chain genesis time (timestamp of slot 0)")
 	flag.Uint64Var(&retentionPeriod, "r", retentionPeriodDefault, "blob retention period in seconds")
 	flag.IntVar(&port, "p", portDefault, "listening port")
 	flag.StringVar(&beaconEndpoint, "b", beaconEndpointDefault, "beacon endpoint")
