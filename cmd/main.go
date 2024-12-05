@@ -24,10 +24,12 @@ import (
 
 const (
 	//sepolia
-	slot0TimestampDefault  uint64 = 1655733600
-	beaconEndpointDefault         = "http://88.99.30.186:3500"
-	portDefault                   = 3600
-	retentionPeriodDefault uint64 = 3600 * 3
+	beaconEndpointDefault = "http://88.99.30.186:3500"
+	portDefault           = 3600
+	secondsPerSlot        = 12
+	slotsPerEpoch         = 32
+
+	retentionPeriodDefault uint64 = 3
 	versionMethod                 = "/eth/v1/node/version"
 	specMethod                    = "/eth/v1/config/spec"
 	genesisMethod                 = "/eth/v1/beacon/genesis"
@@ -45,14 +47,14 @@ var (
 )
 
 func init() {
-	flag.Uint64Var(&slot0Timestamp, "g", slot0TimestampDefault, "beacon chain genesis time (timestamp of slot 0)")
-	flag.Uint64Var(&retentionPeriod, "r", retentionPeriodDefault, "blob retention period in seconds")
+	flag.Uint64Var(&retentionPeriod, "r", retentionPeriodDefault, "blob retention period in epochs")
 	flag.IntVar(&port, "p", portDefault, "listening port")
 	flag.StringVar(&beaconEndpoint, "b", beaconEndpointDefault, "beacon endpoint")
 	flag.Parse()
 }
 
 func main() {
+	slot0Timestamp = queryGenesisTime()
 	targetURL, _ := url.Parse(beaconEndpoint)
 	r := mux.NewRouter()
 	r.HandleFunc(versionMethod, createReverseProxy(targetURL))
@@ -75,7 +77,7 @@ func main() {
 	}()
 	log.Printf("Beacon API wrapper started on %s\n", listener.Addr().String())
 	log.Printf("Beacon endpoint: %s\n", beaconEndpoint)
-	log.Printf("Retaining blobs for %d seconds \n", retentionPeriod)
+	log.Printf("Retaining blobs for %d epochs (%d slots) \n", retentionPeriod, retentionPeriod*slotsPerEpoch)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -107,7 +109,7 @@ func handleBlobSidecarsRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	// if block is not in the retention window  return 200 w/ empty list
 	// refer to https://github.com/prysmaticlabs/prysm/blob/feb16ae4aaa41d9bcd066b54b779dcd38fc928d2/beacon-chain/rpc/lookup/blocker.go#L226C20-L226C41
-	if age > retentionPeriod {
+	if age > retentionPeriod*slotsPerEpoch {
 		w.Header().Set("Content-Type", "application/json")
 		log.Printf("Block %s is not in the retention window\n", id)
 		json.NewEncoder(w).Encode(emptySidecarList)
@@ -129,14 +131,12 @@ func slotAge(id string) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	slotTime := slot0Timestamp + slot*12
-	fmt.Println("slot time:", time.Unix(int64(slotTime), 0).Format("2006/01/02 15:04:05"))
 
-	now := time.Now().Unix()
-	if slotTime > uint64(now) {
-		return 0, errors.New("invalid slot")
+	curSlot := (uint64(time.Now().Unix()) - slot0Timestamp) / secondsPerSlot
+	if curSlot < slot {
+		return 0, errors.New("querying a future slot")
 	}
-	return uint64(now) - slotTime, nil
+	return curSlot - slot, nil
 }
 
 var knownIds = []string{"genesis", "finalized", "head"}
@@ -156,4 +156,29 @@ func isKnownIdentifier(id string) bool {
 		}
 	}
 	return false
+}
+
+type GenesisResponse struct {
+	Data struct {
+		GenesisTime string `json:"genesis_time"`
+	} `json:"data"`
+}
+
+func queryGenesisTime() uint64 {
+	resp, err := http.Get(beaconEndpoint + genesisMethod)
+	if err != nil {
+		log.Fatalf("Error fetching data: %v", err)
+	}
+	defer resp.Body.Close()
+	genesisResponse := new(GenesisResponse)
+	err = json.NewDecoder(resp.Body).Decode(&genesisResponse)
+	if err != nil {
+		log.Fatalf("Error parsing JSON: %v", err)
+	}
+	gt, err := strconv.ParseUint(genesisResponse.Data.GenesisTime, 10, 64)
+	if err != nil {
+		log.Fatalf("Error parsing genesis time: %v", err)
+	}
+	fmt.Println("genesis time", gt)
+	return gt
 }
