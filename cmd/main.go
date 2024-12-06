@@ -23,8 +23,7 @@ import (
 )
 
 const (
-	//sepolia
-	beaconEndpointDefault = "http://88.99.30.186:3500"
+	beaconEndpointDefault = "http://127.0.0.1:5052"
 	portDefault           = 3600
 	secondsPerSlot        = 12
 	slotsPerEpoch         = 32
