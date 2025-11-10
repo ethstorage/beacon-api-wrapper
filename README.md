@@ -10,7 +10,7 @@ A Beacon API wrapper for archiver tests that mocks a short blob retention window
 
 ```
   -b string
-        beacon endpoint (default "http://88.99.30.186:3500")
+        beacon endpoint (default "http://65.108.230.142:3500")
   -p int
         listening port (default 3600)
   -r uint
@@ -25,7 +25,7 @@ The following requests will be redirected to the beacon API:
 /eth/v1/node/version
 /eth/v1/beacon/genesis
 ```
-The `blob_sidecars` request will be redirected to the beacon API if the blobs are within the retention period, otherwise return an empty list: `{"data":[]}`
+The `blobs` request will be redirected to the beacon API if the blobs are within the retention period, otherwise return an empty list: `{"data":[]}`
 ```
-/eth/v1/beacon/blob_sidecars/{block_id}
+/eth/v1/beacon/blobs/{block_id}
 ```

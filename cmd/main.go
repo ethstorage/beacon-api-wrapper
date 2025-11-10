@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	beaconEndpointDefault = "http://127.0.0.1:5052"
+	beaconEndpointDefault = "http://65.108.230.142:3500"
 	portDefault           = 3600
 	secondsPerSlot        = 12
 	slotsPerEpoch         = 32
@@ -33,6 +33,7 @@ const (
 	specMethod                    = "/eth/v1/config/spec"
 	genesisMethod                 = "/eth/v1/beacon/genesis"
 	sidecarsMethod                = "/eth/v1/beacon/blob_sidecars/{id}"
+	blobsMethod                   = "/eth/v1/beacon/blobs/{id}"
 )
 
 var (
@@ -60,6 +61,7 @@ func main() {
 	r.HandleFunc(specMethod, createReverseProxy(targetURL))
 	r.HandleFunc(genesisMethod, createReverseProxy(targetURL))
 	r.HandleFunc(sidecarsMethod, handleBlobSidecarsRequest)
+	r.HandleFunc(blobsMethod, handleBlobsRequest)
 
 	server := &http.Server{
 		Handler: r,
@@ -89,7 +91,37 @@ func main() {
 	log.Println("Server exiting")
 }
 
+// Deprecated
 func handleBlobSidecarsRequest(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Received request for %s\n", r.URL.Path)
+
+	id := mux.Vars(r)["id"]
+	if isHash(id) {
+		http.Error(w, "Block hash is not supported yet", http.StatusInternalServerError)
+		return
+	}
+	if isKnownIdentifier(id) {
+		http.Error(w, fmt.Sprintf("%s is not supported yet", id), http.StatusInternalServerError)
+		return
+	}
+	age, err := slotAge(id)
+	if err != nil {
+		http.Error(w, "Invalid block ID", http.StatusBadRequest)
+		return
+	}
+	// if block is not in the retention window  return 200 w/ empty list
+	// refer to https://github.com/prysmaticlabs/prysm/blob/feb16ae4aaa41d9bcd066b54b779dcd38fc928d2/beacon-chain/rpc/lookup/blocker.go#L226C20-L226C41
+	if age > retentionPeriod*slotsPerEpoch {
+		w.Header().Set("Content-Type", "application/json")
+		log.Printf("Block %s is not in the retention window\n", id)
+		json.NewEncoder(w).Encode(emptySidecarList)
+		return
+	}
+	targetURL, _ := url.Parse(beaconEndpoint)
+	httputil.NewSingleHostReverseProxy(targetURL).ServeHTTP(w, r)
+}
+
+func handleBlobsRequest(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Received request for %s\n", r.URL.Path)
 
 	id := mux.Vars(r)["id"]
