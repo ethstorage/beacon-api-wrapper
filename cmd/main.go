@@ -61,7 +61,9 @@ func main() {
 	r.HandleFunc(specMethod, createReverseProxy(targetURL))
 	r.HandleFunc(genesisMethod, createReverseProxy(targetURL))
 	r.HandleFunc(sidecarsMethod, handleBlobSidecarsRequest)
-	r.HandleFunc(blobsMethod, handleBlobsRequest)
+	// r.HandleFunc(blobsMethod, handleBlobsRequest)
+
+	r.HandleFunc(blobsMethod, handleBlobsRequestMock)
 
 	server := &http.Server{
 		Handler: r,
@@ -148,6 +150,34 @@ func handleBlobsRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	targetURL, _ := url.Parse(beaconEndpoint)
 	httputil.NewSingleHostReverseProxy(targetURL).ServeHTTP(w, r)
+}
+
+func handleBlobsRequestMock(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Received request for %s\n", r.URL.Path)
+
+	const (
+		mockUpstream = "http://65.21.133.53:4200"
+		mockPath     = "/eth/v1/beacon/blob_sidecars/13164810"
+		mockQuery    = "indices=3"
+	)
+
+	targetURL, err := url.Parse(mockUpstream)
+	if err != nil {
+		http.Error(w, "Invalid mock upstream", http.StatusInternalServerError)
+		return
+	}
+
+	proxy := &httputil.ReverseProxy{
+		Director: func(req *http.Request) {
+			req.URL.Scheme = targetURL.Scheme
+			req.URL.Host = targetURL.Host
+			req.URL.Path = mockPath
+			req.URL.RawQuery = mockQuery
+			req.Host = targetURL.Host
+		},
+	}
+
+	proxy.ServeHTTP(w, r)
 }
 
 func createReverseProxy(targetURL *url.URL) http.HandlerFunc {
